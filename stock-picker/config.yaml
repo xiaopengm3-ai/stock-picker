@@ -1,0 +1,64 @@
+# A股智能选股系统 V2.0 — 配置文件
+# Phase 1: 基础设施 + 因子引擎
+
+system:
+  name: "A股智能选股系统"
+  version: "2.0.0-phase1"
+  log_level: "INFO"
+  cache_dir: "./data/cache"
+
+data:
+  timeout_seconds: 30
+  retry_count: 1
+  cache:
+    market_ttl_days: 1
+    financial_ttl_days: 7
+    valuation_ttl_days: 1
+
+screening:
+  top_n: 2
+  min_score: 60
+  filters:
+    exclude_st: true
+    exclude_new_listing_days: 180
+    min_daily_turnover_yuan: 30000000
+    min_float_market_cap_yuan: 2000000000
+  risk_thresholds:
+    goodwill_to_equity_max: 0.50
+    pledge_ratio_max: 0.60
+    debt_ratio_max: 0.70
+    consecutive_loss_quarters: 2
+
+weights:
+  fundamental: 0.35
+  technical: 0.25
+  capital_flow: 0.10
+  industry: 0.10
+
+  fundamental_sub:
+    valuation: 0.35
+    growth: 0.25
+    quality: 0.25
+    forward: 0.15
+
+  technical_sub:
+    trend: 0.35
+    momentum: 0.25
+    volume: 0.20
+    pattern: 0.10
+    multi_tf: 0.10
+
+  capital_sub:
+    north_bound: 0.40
+    main_force: 0.35
+    chips: 0.25
+
+preprocessing:
+  outlier:
+    method: "mad"
+    mad_multiplier: 5.0
+  standardize:
+    method: "zscore"
+  neutralize:
+    industry_enabled: true
+    market_cap_enabled: true

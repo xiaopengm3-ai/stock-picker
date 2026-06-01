@@ -1,0 +1,10 @@
+pandas>=2.0
+numpy>=1.24
+pyyaml>=6.0
+akshare>=1.15
+pyarrow>=14.0
+requests>=2.31
+beautifulsoup4>=4.12
+lxml>=5.0
+pytest>=8.0
+scikit-learn>=1.3
