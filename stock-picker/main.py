@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""A股智能选股系统 V2.0 — CLI入口 (Phase 2)."""
+"""A股智能选股系统 V2.0 — GUI + CLI 双模式入口.
+
+默认启动 GUI (PyQt6 桌面程序)。CLI 模式: python main.py --cli
+"""
 import argparse
 import logging
 import os
@@ -231,6 +234,7 @@ def main():
     parser.add_argument("--top", type=int, default=None, help="输出前N只")
     parser.add_argument("--verbose", action="store_true", help="详细输出")
     parser.add_argument("--ai", default=None, help="AI提供商 (openai/claude/gemini/deepseek/local)")
+    parser.add_argument("--cli", action="store_true", help="命令行模式（默认启动GUI）")
     parser.add_argument("--backtest", action="store_true", help="运行回测")
     parser.add_argument("--start", default="2024-01-01", help="回测起始日期")
     parser.add_argument("--end", default="2025-12-31", help="回测结束日期")
@@ -245,6 +249,17 @@ def main():
     if args.ai:
         config["ai"]["provider"] = args.ai
 
+    # CLI 模式（--cli 或带了命令行专属参数）
+    cli_mode = args.cli or args.backtest or args.eval_factors or args.optimize
+
+    if cli_mode:
+        _run_cli_mode(config, args)
+    else:
+        _run_gui_mode(config)
+
+
+def _run_cli_mode(config, args):
+    """命令行模式."""
     # 回测模式
     if args.backtest:
         from backtest import run_backtest
@@ -258,19 +273,15 @@ def main():
                       f"{t.pnl_pct:+.1%} | 持有{t.hold_days}天 | {t.reason}")
         _wait_and_exit()
 
-    # 因子评价模式
     if args.eval_factors:
         from eval import run_factor_evaluation
         log.info("因子评价模式")
-        # 需要因子得分和未来收益数据（从回测积累）
         log.warning("因子评价需在回测后运行，或提供历史因子得分文件")
         _wait_and_exit()
 
-    # 权重优化模式
     if args.optimize:
         from backtest.optimizer import grid_search_weights
         log.info("权重优化模式")
-        log.warning("优化需运行多次回测，耗时较长")
 
         def objective(cfg):
             from backtest import run_backtest as rb
@@ -284,11 +295,31 @@ def main():
         _wait_and_exit()
 
     results = run_screening(config, date=args.date, top_n=args.top)
-
     if not results:
         log.info("今日无符合条件的标的")
-
     _wait_and_exit()
+
+
+def _run_gui_mode(config):
+    """GUI 模式 — PyQt6 桌面程序."""
+    try:
+        from PyQt6.QtWidgets import QApplication
+        from ui import MainWindow
+    except ImportError as e:
+        log.error(f"PyQt6 未安装: {e}")
+        log.info("请运行: pip install PyQt6")
+        log.info("或使用 CLI 模式: python main.py --cli")
+        _wait_and_exit()
+        return
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("A股智能选股系统")
+
+    window = MainWindow(config)
+    window.show()
+
+    log.info("GUI 已启动")
+    sys.exit(app.exec())
 
 
 def _wait_and_exit():
