@@ -1,9 +1,9 @@
 # A股智能选股系统 V2.0 — 配置文件
-# Phase 1: 基础设施 + 因子引擎
+# Phase 2: +AI分析 + 消息面 + 催化剂 + 市场环境 + 卖出逻辑
 
 system:
   name: "A股智能选股系统"
-  version: "2.0.0-phase1"
+  version: "2.0.0-phase2"
   log_level: "INFO"
   cache_dir: "./data/cache"
 
@@ -29,11 +29,15 @@ screening:
     debt_ratio_max: 0.70
     consecutive_loss_quarters: 2
 
+# 震荡市默认权重（7维 = 100%）
 weights:
   fundamental: 0.35
   technical: 0.25
   capital_flow: 0.10
   industry: 0.10
+  news: 0.10
+  catalyst: 0.05
+  market_regime: 0.05
 
   fundamental_sub:
     valuation: 0.35
@@ -62,3 +66,42 @@ preprocessing:
   neutralize:
     industry_enabled: true
     market_cap_enabled: true
+
+# AI 分析层
+ai:
+  provider: "none"              # openai | claude | gemini | deepseek | local | none
+  api_key: "${AI_API_KEY}"
+  model: "gpt-4o-mini"
+  features:
+    news_sentiment: false
+    catalyst_detection: false
+    thesis_generation: false
+    risk_assessment: false
+  cache:
+    enabled: true
+    ttl_hours: 24
+
+# 卖出规则
+exit:
+  time_stop:
+    short_term_days: 20
+    short_term_return_min: 0.05
+    medium_term_days: 60
+    medium_term_return_min: 0.05
+    long_term_days: 120
+  tech_stop:
+    ema200_enabled: true
+    panic_sell_enabled: true
+    panic_sell_pct: 0.03
+    panic_sell_vol_mult: 2.0
+    trailing_stop_pct: 0.08
+  fundamental_stop:
+    earnings_decline_pct: 0.30
+  profit_taking:
+    tiers:
+      - return: 0.10
+        sell_ratio: 0.30
+      - return: 0.20
+        sell_ratio: 0.30
+      - return: 0.30
+        sell_ratio: 1.00
