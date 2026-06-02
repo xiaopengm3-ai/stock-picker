@@ -28,6 +28,7 @@ from environment import detect_market_state, adjust_weights_for_regime
 from ai import get_ai_client
 from exit import check_exit_conditions, Position as ExitPosition
 
+from risk import apply_hard_filters, Blacklist
 from scoring.engine import compute_composite_score
 from scoring.rank import rank_stocks, determine_cycle
 from output.cli import print_header, print_stock_card, print_no_results, print_summary
@@ -121,12 +122,20 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
     else:
         industry_map = pd.Series("未知", index=all_codes)
 
-    # ===== Step 3: 估值数据 + 基本面初筛 =====
-    log.info("Step 3/8: 估值数据 + 基本面打分...")
+    # ===== Step 3: 估值数据 + 硬过滤 + 基本面初筛 =====
+    log.info("Step 3/8: 估值数据 + 风险过滤 + 基本面打分...")
     valuation_df = fetch_valuation_today()
     if valuation_df.empty:
         log.warning("无法获取估值数据，退出")
         return []
+
+    # 风险过滤
+    bl = Blacklist(str(get_base_dir() / "blacklist.json"))
+    filtered_codes = apply_hard_filters(
+        valuation_df.index.tolist(), valuation_df, config, blacklist=bl.codes,
+    )
+    valuation_df = valuation_df.loc[valuation_df.index.intersection(filtered_codes)]
+    log.info(f"  硬过滤后: {len(valuation_df)} 只")
 
     financial_df = pd.DataFrame()
     indicators_df = pd.DataFrame()
@@ -222,6 +231,11 @@ def main():
     parser.add_argument("--top", type=int, default=None, help="输出前N只")
     parser.add_argument("--verbose", action="store_true", help="详细输出")
     parser.add_argument("--ai", default=None, help="AI提供商 (openai/claude/gemini/deepseek/local)")
+    parser.add_argument("--backtest", action="store_true", help="运行回测")
+    parser.add_argument("--start", default="2024-01-01", help="回测起始日期")
+    parser.add_argument("--end", default="2025-12-31", help="回测结束日期")
+    parser.add_argument("--eval-factors", action="store_true", help="运行因子评价")
+    parser.add_argument("--optimize", action="store_true", help="权重参数优化")
     args = parser.parse_args()
 
     if args.verbose:
@@ -231,16 +245,56 @@ def main():
     if args.ai:
         config["ai"]["provider"] = args.ai
 
+    # 回测模式
+    if args.backtest:
+        from backtest import run_backtest
+        log.info(f"回测模式: {args.start} → {args.end}")
+        result = run_backtest(config, args.start, args.end,
+                              screening_fn=run_screening, top_n=args.top or 2)
+        print(result["metrics"].summary())
+        if args.verbose and result["trades"]:
+            for t in result["trades"]:
+                print(f"  {t.code} | {t.entry_date}→{t.exit_date} | "
+                      f"{t.pnl_pct:+.1%} | 持有{t.hold_days}天 | {t.reason}")
+        _wait_and_exit()
+
+    # 因子评价模式
+    if args.eval_factors:
+        from eval import run_factor_evaluation
+        log.info("因子评价模式")
+        # 需要因子得分和未来收益数据（从回测积累）
+        log.warning("因子评价需在回测后运行，或提供历史因子得分文件")
+        _wait_and_exit()
+
+    # 权重优化模式
+    if args.optimize:
+        from backtest.optimizer import grid_search_weights
+        log.info("权重优化模式")
+        log.warning("优化需运行多次回测，耗时较长")
+
+        def objective(cfg):
+            from backtest import run_backtest as rb
+            result = rb(cfg, "2024-01-01", "2024-12-31",
+                        screening_fn=run_screening, top_n=2)
+            return result["metrics"].sharpe
+
+        df = grid_search_weights(config, objective)
+        print("\n最优权重 Top 10:")
+        print(df.head(10).to_string(index=False))
+        _wait_and_exit()
+
     results = run_screening(config, date=args.date, top_n=args.top)
 
     if not results:
         log.info("今日无符合条件的标的")
 
+    _wait_and_exit()
+
+
+def _wait_and_exit():
     if getattr(sys, 'frozen', False):
         print()
         input("按 Enter 键退出...")
-        sys.exit(0)
-
     sys.exit(0)
 
 
