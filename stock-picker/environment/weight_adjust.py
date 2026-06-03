@@ -42,9 +42,12 @@ def adjust_weights_for_regime(
         w["catalyst"] = w.get("catalyst", 0.05) + tech_weight * 0.2
         w["capital_flow"] = w.get("capital_flow", 0.10) + tech_weight * 0.2
 
-    # 归一化确保总和 = 1.0
-    total = sum(w.values())
+    # 归一化确保总和 = 1.0 — 只处理数字值，过滤子字典
+    numeric_weights = {k: v for k, v in w.items() if isinstance(v, (int, float))}
+    total = sum(numeric_weights.values())
     if total > 0 and abs(total - 1.0) > 0.01:
-        w = {k: v / total for k, v in w.items()}
+        factor = 1.0 / total
+        for k in numeric_weights:
+            w[k] = numeric_weights[k] * factor
 
     return w
