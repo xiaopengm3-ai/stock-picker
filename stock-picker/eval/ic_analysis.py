@@ -1,7 +1,21 @@
 """IC / ICIR 分析."""
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr
+
+
+def _spearmanr(x: np.ndarray, y: np.ndarray) -> float:
+    """纯 numpy Spearman 秩相关系数（替代 scipy.stats.spearmanr）."""
+    x_rank = pd.Series(x).rank().values
+    y_rank = pd.Series(y).rank().values
+    n = len(x_rank)
+    if n < 3:
+        return 0.0
+    # Pearson correlation of ranks
+    mx = x_rank.mean()
+    my = y_rank.mean()
+    num = ((x_rank - mx) * (y_rank - my)).sum()
+    den = np.sqrt(((x_rank - mx) ** 2).sum() * ((y_rank - my) ** 2).sum())
+    return float(num / den) if den > 0 else 0.0
 
 
 def compute_ic(factor_scores: pd.Series, forward_returns: pd.Series) -> float:
@@ -17,7 +31,7 @@ def compute_ic(factor_scores: pd.Series, forward_returns: pd.Series) -> float:
     common = factor_scores.dropna().index.intersection(forward_returns.dropna().index)
     if len(common) < 10:
         return 0.0
-    ic, _ = spearmanr(factor_scores[common], forward_returns[common])
+    ic = _spearmanr(factor_scores[common].values, forward_returns[common].values)
     return ic if not np.isnan(ic) else 0.0
 
 
