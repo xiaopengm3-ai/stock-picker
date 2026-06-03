@@ -305,10 +305,18 @@ def _run_cli_mode(config, args):
     _wait_and_exit()
 
 
+def _gui_excepthook(exc_type, exc_value, tb):
+    """全局异常捕获 — 弹窗显示错误."""
+    import traceback
+    from PyQt6.QtWidgets import QMessageBox
+    tb_str = "".join(traceback.format_exception(exc_type, exc_value, tb))
+    QMessageBox.critical(None, "程序错误", f"发生未捕获的异常:\n\n{tb_str}")
+
+
 def _run_gui_mode(config):
     """GUI 模式 — PyQt6 桌面程序."""
     try:
-        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtWidgets import QApplication, QMessageBox
         from ui import MainWindow
     except ImportError as e:
         log.error(f"PyQt6 未安装: {e}")
@@ -320,10 +328,20 @@ def _run_gui_mode(config):
     app = QApplication(sys.argv)
     app.setApplicationName("A股智能选股系统")
 
-    window = MainWindow(config)
-    window.show()
+    # 全局异常捕获
+    sys.excepthook = _gui_excepthook
 
-    log.info("GUI 已启动")
+    try:
+        window = MainWindow(config)
+        window.show()
+        log.info("GUI 已启动")
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        QMessageBox.critical(None, "启动错误", f"GUI 启动失败:\n\n{tb}")
+        _wait_and_exit()
+        return
+
     sys.exit(app.exec())
 
 
