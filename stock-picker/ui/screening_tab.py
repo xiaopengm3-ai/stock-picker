@@ -164,8 +164,22 @@ class ScreeningTab(QWidget):
         self.run_btn.setEnabled(True)
 
         if not results:
-            self.status_label.setText("今日无符合条件的标的")
+            self.status_label.setText("未获取到任何数据，请检查网络或数据源")
             return
+
+        # 显示统计
+        stats = results[0].get("_stats", {})
+        total = stats.get("total", "?")
+        after_f = stats.get("after_filter", "?")
+        after_r = stats.get("after_risk", "?")
+        top_score = stats.get("top_score", 0)
+        threshold_met = stats.get("threshold_met", False)
+
+        self.status_label.setText(
+            f"扫描: {total}只 → 过滤后{after_f}只 → 入选{after_r}只 | "
+            f"最高分: {top_score:.1f} | "
+            f"{'✓ 达标' if threshold_met else '⚠ 均未达阈值（显示最高分）'}"
+        )
 
         # 移除 stretch
         last = self.results_layout.itemAt(self.results_layout.count() - 1)
@@ -173,11 +187,14 @@ class ScreeningTab(QWidget):
             self.results_layout.removeItem(last)
 
         for i, r in enumerate(results, 1):
-            card = ScoreCard(i, r)
+            # 跳过统计信息
+            r_display = {k: v for k, v in r.items() if k != "_stats"}
+            if not r_display.get("code"):
+                continue
+            card = ScoreCard(i, r_display)
             self.results_layout.addWidget(card)
 
         self.results_layout.addStretch()
-        self.status_label.setText(f"选股完成 — 精选 {len(results)} 只")
 
     def _on_error(self, msg: str):
         self.progress_bar.setVisible(False)

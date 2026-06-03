@@ -179,7 +179,9 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
         regime_score=market_state.temperature,
         weights=adjusted_weights,
     )
-    top_stocks = rank_stocks(composite, top_n=top_n, min_score=min_score)
+    # 始终返回 Top N 的最高分股票，min_score 只影响置信度标签
+    top_stocks = rank_stocks(composite, top_n=top_n, min_score=0.0)
+    top_stocks_filtered = rank_stocks(composite, top_n=top_n, min_score=min_score)
 
     # ===== Step 8: AI 分析 (Top stocks) =====
     log.info("Step 8/8: AI 投资逻辑生成...")
@@ -199,10 +201,14 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
     for name, info in market_state.details.items():
         print(f"    {name}: {info.get('close', '-')}  {info.get('trend', '-')}  {info.get('ret_60d', '-')}")
 
-    if top_stocks.empty:
+    # 始终显示最高分股票（即使没达到阈值）
+    display_stocks = top_stocks_filtered if not top_stocks_filtered.empty else top_stocks
+    if display_stocks.empty:
         print_no_results(min_score)
     else:
-        for i, (code, row) in enumerate(top_stocks.iterrows(), 1):
+        if top_stocks_filtered.empty:
+            print(f"\n  ⚠ 无股票达到最低分数阈值 ({min_score})，以下为最高分标的:")
+        for i, (code, row) in enumerate(display_stocks.iterrows(), 1):
             name = code_to_name.get(code, code)
             ind = str(industry_map.get(code, "未知"))
 
@@ -229,7 +235,22 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
         elapsed_seconds=elapsed,
     )
 
-    return top_stocks.to_dict("records") if not top_stocks.empty else []
+    # 始终返回不为空（展示最高分），附带统计信息
+    stats = {
+        "total": len(all_codes),
+        "after_filter": len(valuation_df),
+        "after_risk": len(fundamental_scores),
+        "final_count": len(top_stocks_filtered) if not top_stocks_filtered.empty else 0,
+        "elapsed": elapsed,
+        "top_score": float(composite["final_score"].iloc[0]) if len(composite) > 0 else 0,
+        "threshold_met": not top_stocks_filtered.empty,
+    }
+    display = display_stocks if not display_stocks.empty else top_stocks
+    results = display.to_dict("records") if not display.empty else []
+    # 把 stats 附加到第一条结果上（GUI 可用，CLI 忽略）
+    if results:
+        results[0]["_stats"] = stats
+    return results
 
 
 def main():
