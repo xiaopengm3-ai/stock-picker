@@ -52,7 +52,12 @@ def get_base_dir() -> Path:
 
 def load_config(path: str = "config.yaml") -> dict:
     if not os.path.isabs(path):
-        path = str(get_base_dir() / path)
+        # PyInstaller 打包后，config.yaml 在 _MEIPASS 临时目录中
+        if getattr(sys, 'frozen', False):
+            base = Path(sys._MEIPASS)
+        else:
+            base = get_base_dir()
+        path = str(base / path)
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
