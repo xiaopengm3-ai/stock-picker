@@ -20,6 +20,7 @@ from data.valuation import fetch_valuation_today
 from data.industry import fetch_industry_classification
 from data.market import fetch_all_daily_hist
 from data.index import fetch_all_index_daily
+from data.bulk_financial import fetch_all_bulk_financials
 
 from factors.fundamental import compute_fundamental_scores
 from factors.technical import compute_technical_scores
@@ -167,8 +168,8 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
     valuation_df = valuation_df.loc[valuation_df.index.intersection(filtered_codes)]
     log.info(f"  硬过滤后: {len(valuation_df)} 只")
 
-    financial_df = pd.DataFrame()
-    indicators_df = pd.DataFrame()
+    # 批量获取财务数据（一次调用拿全市场）
+    indicators_df, financial_df = fetch_all_bulk_financials()
     fundamental_scores = compute_fundamental_scores(valuation_df, indicators_df, financial_df, industry_map)
     log.info(f"  基本面打分: {len(fundamental_scores)} 只")
 
@@ -202,6 +203,11 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
         regime_score=market_state.temperature,
         weights=adjusted_weights,
     )
+
+    # 注入最新收盘价（回测和展示用）
+    if not market_df.empty and "close" in market_df.columns:
+        latest_close = market_df.groupby("code")["close"].last()
+        composite["close_price"] = latest_close.reindex(composite.index)
     # 始终返回 Top N 的最高分股票，min_score 只影响置信度标签
     top_stocks = rank_stocks(composite, top_n=top_n, min_score=0.0)
     top_stocks_filtered = rank_stocks(composite, top_n=top_n, min_score=min_score)

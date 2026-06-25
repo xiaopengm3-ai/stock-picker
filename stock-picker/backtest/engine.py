@@ -97,7 +97,7 @@ class BacktestEngine:
 
                 for r in results[:slots]:
                     code = r["code"]
-                    price = r.get("price", 100.0)  # 估价
+                    price = r.get("close_price") or r.get("price") or 100.0
                     qty = cash_per_slot / (price * (1 + commission))
                     self.sim.place_order(code, "BUY", qty, price, date_str,
                                          reason=f"选股排名#{r.get('rank', '?')}")

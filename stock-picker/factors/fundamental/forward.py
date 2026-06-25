@@ -42,17 +42,60 @@ def compute_analyst_upgrade(financial_df: pd.DataFrame) -> pd.Series:
 
 
 def compute_advance_receipts(financial_df: pd.DataFrame) -> pd.Series:
-    if financial_df.empty:
-        return pd.Series()
+    """F18: 预收账款/合同负债环比 — 用 advance_receipts 环比变化率打分."""
+    if financial_df.empty or "advance_receipts" not in financial_df.columns:
+        codes = financial_df.index.get_level_values("code").unique() if not financial_df.empty else pd.Index([])
+        return pd.Series(np.nan, index=codes, name="F18_score")
     codes = financial_df.index.get_level_values("code").unique()
-    return pd.Series(50.0, index=codes, name="F18_score")
+    scores = {}
+    for code in codes:
+        try:
+            data = financial_df.loc[code]
+            if isinstance(data, pd.Series):
+                scores[code] = np.nan
+                continue
+            ar = data["advance_receipts"].dropna()
+            if len(ar) < 2:
+                scores[code] = np.nan
+                continue
+            pct = (ar.iloc[-1] - ar.iloc[-2]) / abs(ar.iloc[-2]) * 100 if ar.iloc[-2] != 0 else 0
+            # ≥20% → 满分, ≤-10% → 0分, 线性映射
+            scores[code] = max(0.0, min(100.0, (pct + 10) / 30 * 100))
+        except Exception:
+            scores[code] = np.nan
+    return pd.Series(scores, name="F18_score")
 
 
 def compute_cfo_trend(financial_df: pd.DataFrame) -> pd.Series:
-    if financial_df.empty:
-        return pd.Series()
+    """F19: 经营现金流趋势 — 用 operating_cf 连续改善打分."""
+    if financial_df.empty or "operating_cf" not in financial_df.columns:
+        codes = financial_df.index.get_level_values("code").unique() if not financial_df.empty else pd.Index([])
+        return pd.Series(np.nan, index=codes, name="F19_score")
     codes = financial_df.index.get_level_values("code").unique()
-    return pd.Series(50.0, index=codes, name="F19_score")
+    scores = {}
+    for code in codes:
+        try:
+            data = financial_df.loc[code]
+            if isinstance(data, pd.Series):
+                scores[code] = np.nan
+                continue
+            cf = data["operating_cf"].dropna()
+            if len(cf) < 2:
+                scores[code] = np.nan
+                continue
+            # 连续改善 = 最近两期都为正且增长
+            if len(cf) >= 2 and cf.iloc[-1] > 0 and cf.iloc[-2] > 0:
+                if cf.iloc[-1] > cf.iloc[-2]:
+                    scores[code] = 100.0  # 连续改善
+                else:
+                    scores[code] = 50.0   # 正但下降
+            elif cf.iloc[-1] > 0:
+                scores[code] = 60.0   # 最近一期正
+            else:
+                scores[code] = 20.0   # 负现金流
+        except Exception:
+            scores[code] = np.nan
+    return pd.Series(scores, name="F19_score")
 
 
 def compute_insider_buying(financial_df: pd.DataFrame) -> pd.Series:
