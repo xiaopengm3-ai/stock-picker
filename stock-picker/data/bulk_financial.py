@@ -57,6 +57,7 @@ def fetch_bulk_earnings(report_date: str | None = None) -> pd.DataFrame:
             "净利润-同比增长": "profit_growth",
             "销售毛利率": "gross_margin",
             "每股收益": "eps",
+            "每股净资产": "bvps",
             "净利润-净利润": "net_profit",
             "营业总收入-营业总收入": "revenue",
         }
@@ -66,7 +67,7 @@ def fetch_bulk_earnings(report_date: str | None = None) -> pd.DataFrame:
         df["code"] = df["code"].astype(str).str.zfill(6)
         df = df.set_index("code")
         keep = [c for c in ["roe", "revenue_growth", "profit_growth", "gross_margin",
-                             "eps", "net_profit", "revenue"] if c in df.columns]
+                             "eps", "bvps", "net_profit", "revenue"] if c in df.columns]
         return df[keep].apply(pd.to_numeric, errors="coerce")
     except Exception as e:
         log.warning(f"批量业绩报表获取失败: {e}")

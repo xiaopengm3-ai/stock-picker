@@ -76,12 +76,14 @@ def fetch_valuation_today() -> pd.DataFrame:
             result["pb"] = result["pb"].where(result["pb"] > 0, np.nan)
 
     # 保留需要的列
-    keep = [c for c in ["price", "pe", "pb", "eps", "bvps", "revenue_growth",
-                         "profit_growth", "gross_margin", "roe", "net_profit",
-                         "revenue"] if c in result.columns]
+    keep = [c for c in ["price", "pe", "pb", "ps", "dividend_yield", "eps", "bvps",
+                         "revenue_growth", "profit_growth", "gross_margin", "roe",
+                         "net_profit", "revenue"] if c in result.columns]
     result = result[keep]
 
-    log.info(f"  估值数据: {len(result)} 只 (PE: {result['pe'].notna().sum()}, PB: {result['pb'].notna().sum()})")
+    pe_count = result['pe'].notna().sum() if 'pe' in result.columns else 0
+    pb_count = result['pb'].notna().sum() if 'pb' in result.columns else 0
+    log.info(f"  估值数据: {len(result)} 只 (PE: {pe_count}, PB: {pb_count})")
     return result
 
 
