@@ -158,7 +158,9 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
     valuation_df = fetch_valuation_today()
     if valuation_df.empty:
         log.warning("无法获取估值数据，退出")
-        return []
+        return [], {"total": len(all_codes), "after_filter": 0, "after_risk": 0,
+                     "final_count": 0, "elapsed": time.time() - t0,
+                     "top_score": 0, "threshold_met": False}
 
     # 风险过滤
     bl = Blacklist(str(get_base_dir() / "blacklist.json"))
