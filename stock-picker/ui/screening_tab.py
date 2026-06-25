@@ -159,16 +159,23 @@ class ScreeningTab(QWidget):
         self.worker.error.connect(self._on_error)
         self.worker.start()
 
-    def _on_finished(self, results):
+    def _on_finished(self, data):
         self.progress_bar.setVisible(False)
         self.run_btn.setEnabled(True)
+
+        # 解包 {"results": [...], "stats": {...}}
+        if isinstance(data, dict) and "results" in data:
+            results = data["results"]
+            stats = data.get("stats", {})
+        else:
+            results = data if isinstance(data, list) else []
+            stats = {}
 
         if not results:
             self.status_label.setText("未获取到任何数据，请检查网络或数据源")
             return
 
         # 显示统计
-        stats = results[0].get("_stats", {})
         total = stats.get("total", "?")
         after_f = stats.get("after_filter", "?")
         after_r = stats.get("after_risk", "?")
@@ -187,11 +194,9 @@ class ScreeningTab(QWidget):
             self.results_layout.removeItem(last)
 
         for i, r in enumerate(results, 1):
-            # 跳过统计信息
-            r_display = {k: v for k, v in r.items() if k != "_stats"}
-            if not r_display.get("code"):
+            if not r.get("code"):
                 continue
-            card = ScoreCard(i, r_display)
+            card = ScoreCard(i, r)
             self.results_layout.addWidget(card)
 
         self.results_layout.addStretch()

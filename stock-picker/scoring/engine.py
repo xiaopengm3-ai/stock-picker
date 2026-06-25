@@ -59,26 +59,30 @@ def compute_composite_score(
         if not df.empty and col_name in df.columns:
             dim_data[dim] = df[col_name].reindex(all_codes)
             result[f"{dim}_total"] = dim_data[dim]
-        elif dim in ("news", "catalyst"):
-            dim_data[dim] = pd.Series(50.0, index=all_codes)  # 默认中性
-            result[f"{dim}_total"] = 50.0
         else:
+            # 无真实数据 → NaN，让引擎重分配权重，而非注入常量50
             dim_data[dim] = pd.Series(np.nan, index=all_codes)
             result[f"{dim}_total"] = np.nan
 
-    # market_regime 维度：统一赋值
+    # market_regime 维度：统一赋值（有真实数据时才参与评分）
     dim_data["market_regime"] = pd.Series(regime_score, index=all_codes)
     result["market_regime_total"] = regime_score
 
-    # 缺失维度：权重按比例重分配
-    available_dims = {k: v for k, v in dim_data.items() if not v.isna().all()}
+    # 缺失维度：覆盖度 < 20% 的维度视为无效，权重按比例重分配
+    min_coverage = 0.2
+    available_dims = {
+        k: v for k, v in dim_data.items()
+        if v.notna().sum() / max(len(v), 1) >= min_coverage
+    }
     total_weight = sum(w.get(k, 0) for k in available_dims)
 
     final = pd.Series(0.0, index=all_codes)
     for dim, scores in available_dims.items():
         dim_weight = w.get(dim, 0)
         adjusted_weight = dim_weight / total_weight if total_weight > 0 else dim_weight
-        final += scores.fillna(50.0) * adjusted_weight
+        # 用该维度已有分数的中位数填充缺失，而非固定50
+        fill_val = scores.median() if scores.notna().any() else 50.0
+        final += scores.fillna(fill_val) * adjusted_weight
 
     result["final_score"] = final
 

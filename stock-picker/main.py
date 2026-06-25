@@ -6,6 +6,7 @@
 import argparse
 import logging
 import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -36,6 +37,20 @@ from scoring.engine import compute_composite_score
 from scoring.rank import rank_stocks, determine_cycle
 from output.cli import print_header, print_stock_card, print_no_results, print_summary
 
+def _expand_env_vars(obj):
+    """递归展开 ${VAR_NAME} 引用为 os.environ 值."""
+    if isinstance(obj, str):
+        def replacer(m):
+            return os.environ.get(m.group(1), m.group(0))
+        return re.sub(r'\$\{(\w+)\}', replacer, obj)
+    elif isinstance(obj, dict):
+        return {k: _expand_env_vars(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_expand_env_vars(v) for v in obj]
+    return obj
+
+
+# 日志级别在 load_config 后设置，这里先用默认值
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-5s | %(message)s",
@@ -59,7 +74,14 @@ def load_config(path: str = "config.yaml") -> dict:
             base = get_base_dir()
         path = str(base / path)
     with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+    # 展开 ${ENV_VAR} 引用
+    config = _expand_env_vars(config)
+    # 应用配置中的日志级别
+    log_level = config.get("system", {}).get("log_level", "INFO").upper()
+    if hasattr(logging, log_level):
+        logging.getLogger().setLevel(getattr(logging, log_level))
+    return config
 
 
 def get_stock_list(fetcher: DataFetcher) -> pd.DataFrame:
@@ -156,7 +178,8 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
     log.info(f"Step 4/8: 行情数据 + 技术面打分 (前{len(top200)}只)...")
     market_df = fetch_all_daily_hist(top200, start_date="20250101", end_date=target_date.replace("-", ""))
     if market_df.empty:
-        technical_scores = pd.DataFrame({"technical_total": 50.0}, index=fundamental_scores.index)
+        # 无行情数据 → NaN，让融合引擎重分配技术面权重
+        technical_scores = pd.DataFrame({"technical_total": float("nan")}, index=fundamental_scores.index)
     else:
         technical_scores = compute_technical_scores(market_df)
 
@@ -227,30 +250,29 @@ def run_screening(config: dict, date: str | None = None, top_n: int | None = Non
 
             print_stock_card(i, code, name, ind, row, thesis=thesis, risks=risks, cycle=cycle)
 
+    # final_count 用达标数（非显示数）
+    filtered_count = len(top_stocks_filtered) if not top_stocks_filtered.empty else 0
     print_summary(
         total_stocks=len(all_codes),
         after_filter=len(valuation_df),
         after_risk=len(fundamental_scores),
-        final_count=len(top_stocks),
+        final_count=filtered_count,
         elapsed_seconds=elapsed,
     )
 
-    # 始终返回不为空（展示最高分），附带统计信息
+    # 统计信息与结果分开返回
     stats = {
         "total": len(all_codes),
         "after_filter": len(valuation_df),
         "after_risk": len(fundamental_scores),
-        "final_count": len(top_stocks_filtered) if not top_stocks_filtered.empty else 0,
+        "final_count": filtered_count,
         "elapsed": elapsed,
         "top_score": float(composite["final_score"].iloc[0]) if len(composite) > 0 else 0,
         "threshold_met": not top_stocks_filtered.empty,
     }
     display = display_stocks if not display_stocks.empty else top_stocks
     results = display.to_dict("records") if not display.empty else []
-    # 把 stats 附加到第一条结果上（GUI 可用，CLI 忽略）
-    if results:
-        results[0]["_stats"] = stats
-    return results
+    return results, stats
 
 
 def main():
@@ -320,7 +342,7 @@ def _run_cli_mode(config, args):
         print(df.head(10).to_string(index=False))
         _wait_and_exit()
 
-    results = run_screening(config, date=args.date, top_n=args.top)
+    results, stats = run_screening(config, date=args.date, top_n=args.top)
     if not results:
         log.info("今日无符合条件的标的")
     _wait_and_exit()

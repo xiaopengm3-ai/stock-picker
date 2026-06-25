@@ -20,8 +20,8 @@ class ScreeningWorker(QThread):
         try:
             import main as main_module
             self.progress.emit("正在获取股票列表...")
-            results = main_module.run_screening(self.config, date=self.date, top_n=self.top_n)
-            self.finished.emit(results)
+            results, stats = main_module.run_screening(self.config, date=self.date, top_n=self.top_n)
+            self.finished.emit({"results": results, "stats": stats})
         except Exception as e:
             tb = traceback.format_exc()
             self.error.emit(f"{e}\n\n{tb}")

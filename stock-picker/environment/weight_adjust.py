@@ -34,13 +34,15 @@ def adjust_weights_for_regime(
         w["fundamental"] = max(0.25, w.get("fundamental", 0.35) - 0.05)
 
     elif state.regime == "熊市" and state.temperature < 25:
-        # 技术面归零，分配给其他维度
-        tech_weight = w.get("technical", 0.25)
+        # 技术面归零，分配给已有维度（不重新添加被移除的维度）
+        tech_weight = w.get("technical", 0.0)
         w["technical"] = 0.0
-        w["fundamental"] = w.get("fundamental", 0.35) + tech_weight * 0.4
-        w["news"] = w.get("news", 0.10) + tech_weight * 0.2
-        w["catalyst"] = w.get("catalyst", 0.05) + tech_weight * 0.2
-        w["capital_flow"] = w.get("capital_flow", 0.10) + tech_weight * 0.2
+        redistributors = ["fundamental", "news", "catalyst", "capital_flow"]
+        redistributors = [k for k in redistributors if k in w]
+        if redistributors:
+            share = tech_weight / len(redistributors)
+            for k in redistributors:
+                w[k] += share
 
     # 归一化确保总和 = 1.0 — 只处理数字值，过滤子字典
     numeric_weights = {k: v for k, v in w.items() if isinstance(v, (int, float))}
