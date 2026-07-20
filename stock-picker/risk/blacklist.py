@@ -1,7 +1,10 @@
 """黑名单管理."""
 import json
+import logging
 import os
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 
 class Blacklist:
@@ -20,12 +23,15 @@ class Blacklist:
                     data = json.load(f)
                 self._codes = set(data.get("codes", []))
                 self._reasons = data.get("reasons", {})
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning(f"黑名单加载失败，使用空列表: {e}")
 
     def save(self):
-        with open(self.filepath, "w", encoding="utf-8") as f:
-            json.dump({"codes": list(self._codes), "reasons": self._reasons}, f, ensure_ascii=False, indent=2)
+        try:
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                json.dump({"codes": list(self._codes), "reasons": self._reasons}, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            log.error(f"黑名单保存失败: {e}")
 
     def add(self, code: str, reason: str = ""):
         self._codes.add(code)
