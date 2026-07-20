@@ -30,7 +30,7 @@ Claude Code
 - `Notification` 事件：权限请求提醒（type=permission）
 - `Stop` 事件：空闲/完成提醒（type=idle）
 
-Hook stdin 收到 JSON（含 `message`、`cwd`、`session_id`），由包装命令读入并传给弹窗脚本。Hook timeout 5s；脚本用 `Start-Process` 分离启动弹窗后立即返回，不阻塞 CC。
+Hook stdin 收到 JSON（含 `message`、`cwd`、`session_id`），由包装命令读入并传给弹窗脚本。Hook timeout 10s；脚本用 `Start-Process` 分离启动弹窗后立即返回，不阻塞 CC。
 
 ### 2. 展示层 — cc-toast.ps1
 
