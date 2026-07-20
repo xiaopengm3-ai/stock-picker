@@ -1,4 +1,4 @@
-# cc-toast-hook.ps1 — Claude Code hook 入口
+﻿# cc-toast-hook.ps1 — Claude Code hook 入口
 # settings.json 中配置: powershell.exe ... -File cc-toast-hook.ps1 -Type permission|idle
 # stdin 收到 CC 的 hook JSON（含 message/cwd），解析后分离启动 cc-toast.ps1，立即返回不阻塞 CC
 param(
