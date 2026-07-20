@@ -2,8 +2,8 @@
 # 用法: powershell -STA -File cc-toast.ps1 -Type permission -MessageB64 <b64> -CwdB64 <b64> -HostPid <pid>
 param(
     [ValidateSet('permission','idle')][string]$Type = 'permission',
-    [string]$MessageB64 = '-',
-    [string]$CwdB64 = '-',
+    [string]$MessageB64 = '_',
+    [string]$CwdB64 = '_',
     [int]$HostPid = 0
 )
 
@@ -89,7 +89,7 @@ public class NoActivateForm : System.Windows.Forms.Form
 '@
 
     function ConvertFrom-B64([string]$s) {
-        if ([string]::IsNullOrEmpty($s) -or $s -eq '-') { return '' }
+        if ([string]::IsNullOrEmpty($s) -or $s -eq '_') { return '' }
         try { return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($s)) } catch { return '' }
     }
     $Message = ConvertFrom-B64 $MessageB64

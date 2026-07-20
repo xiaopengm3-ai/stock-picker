@@ -33,7 +33,7 @@ try {
     } catch {}
 
     function To-B64([string]$s) {
-        if ([string]::IsNullOrEmpty($s)) { return '-' }
+        if ([string]::IsNullOrEmpty($s)) { return '_' }
         return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($s))
     }
 
