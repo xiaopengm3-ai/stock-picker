@@ -6,7 +6,8 @@ param(
 )
 
 try {
-    $raw = [Console]::In.ReadToEnd()
+    $reader = New-Object IO.StreamReader([Console]::OpenStandardInput(), [Text.Encoding]::UTF8)
+    $raw = $reader.ReadToEnd()
     $msg = ''; $cwd = ''
     if ($raw) {
         try {
